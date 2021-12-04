@@ -12,35 +12,38 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let input = fs::read_to_string(&args[1])?;
-    let lines = input.lines().collect::<Vec<_>>();
-    let bit_counts = get_bit_counts(&lines)?;
-    let (gamma, epsilon) = calc_gamma_epsilon(lines.len(), &bit_counts);
+    let mut lines = input.lines().collect::<Vec<_>>();
+    lines.sort();
+    let (gamma, epsilon) = calc_gamma_epsilon(&lines)?;
 
     println!("Part 1: {}", gamma * epsilon);
 
-    let oxygen_gen_rating = calc_oxygen_generator_rating(&lines);
-    let co2_scrbber_rating = calc_co2_scrubber_rating(&lines);
+    let oxygen_gen_rating = calc_life_support_rating(&lines, true);
+    let co2_scrbber_rating = calc_life_support_rating(&lines, false);
 
     println!("Part 2: {}", oxygen_gen_rating * co2_scrbber_rating);
 
     Ok(())
 }
 
-fn calc_oxygen_generator_rating(lines: &[&str]) -> u32 {
-    let mut lines = lines.iter().collect::<Vec<_>>();
-    lines.sort();
-
-    let mut candidates = &lines[..];
+fn calc_life_support_rating(sorted_lines: &[&str], most_common: bool) -> u32 {
+    let mut candidates = &sorted_lines[..];
     let mut pos = 0;
     while candidates.len() != 1 {
         let majority_count = candidates.len() / 2;
         let num_zeros =
             candidates.partition_point(|l| l.chars().nth(pos).expect("No match found!") == '0');
 
-        if num_zeros > majority_count {
-            candidates = &candidates[0..num_zeros];
+        let (majority, minority) = if most_common {
+            (&candidates[0..num_zeros], &candidates[num_zeros..])
         } else {
-            candidates = &candidates[num_zeros..];
+            (&candidates[num_zeros..], &candidates[0..num_zeros])
+        };
+
+        if num_zeros > majority_count {
+            candidates = majority;
+        } else {
+            candidates = minority;
         }
 
         pos += 1;
@@ -49,33 +52,9 @@ fn calc_oxygen_generator_rating(lines: &[&str]) -> u32 {
     u32::from_str_radix(candidates[0], 2).unwrap()
 }
 
-fn calc_co2_scrubber_rating(lines: &[&str]) -> u32 {
-    let mut lines = lines.iter().collect::<Vec<_>>();
-    lines.sort();
-
-    let mut candidates = &lines[..];
-    let mut pos = 0;
-    while candidates.len() != 1 {
-        let majority_count = candidates.len() / 2;
-        let num_zeros =
-            candidates.partition_point(|l| l.chars().nth(pos).expect("No match found!") == '0');
-
-        if num_zeros > majority_count {
-            candidates = &candidates[num_zeros..];
-        } else {
-            candidates = &candidates[0..num_zeros];
-        }
-
-        pos += 1;
-    }
-
-    u32::from_str_radix(candidates[0], 2).unwrap()
-}
-
-fn get_bit_counts(lines: &[&str]) -> Result<Vec<usize>, Box<dyn Error>> {
+fn calc_gamma_epsilon(lines: &[&str]) -> Result<(u32, u32), Box<dyn Error>> {
     let binary_len = lines.get(0).ok_or("Empty input")?.len();
     let mut bit_counts: Vec<usize> = vec![0; binary_len];
-
     for l in lines {
         if l.len() > binary_len {
             return Err("Uneven line lengths!".into());
@@ -90,12 +69,7 @@ fn get_bit_counts(lines: &[&str]) -> Result<Vec<usize>, Box<dyn Error>> {
         }
     }
 
-    Ok(bit_counts)
-}
-
-fn calc_gamma_epsilon(n_lines: usize, bit_counts: &Vec<usize>) -> (u32, u32) {
-    let binary_len = bit_counts.len();
-    let majority_count = (n_lines / 2) as u32;
+    let majority_count = (lines.len() / 2) as u32;
     let gamma_rate: u32 = bit_counts.iter().fold(0, |acc, count| {
         let bit = if *count as u32 > majority_count { 1 } else { 0 };
         (acc << 1) + bit
@@ -103,7 +77,7 @@ fn calc_gamma_epsilon(n_lines: usize, bit_counts: &Vec<usize>) -> (u32, u32) {
 
     let epsilon_rate = ((!gamma_rate) << (32 - binary_len)) >> (32 - binary_len);
 
-    (gamma_rate, epsilon_rate)
+    Ok((gamma_rate, epsilon_rate))
 }
 
 #[cfg(test)]
@@ -124,33 +98,21 @@ mod tests {
 01010";
 
     #[test]
-    fn test_get_bit_counts() {
-        let expected_bit_counts = vec![7, 5, 8, 7, 5];
-        let lines = SAMPLE_INPUT.lines().collect::<Vec<_>>();
-        let bit_counts = get_bit_counts(&lines).ok().unwrap();
-        assert_eq!(expected_bit_counts, bit_counts);
-    }
-
-    #[test]
     fn test_calc_gamma_epsilon() {
         let lines = SAMPLE_INPUT.lines().collect::<Vec<_>>();
-        let bit_counts = get_bit_counts(&lines).ok().unwrap();
-        let (gamma, epsilon) = calc_gamma_epsilon(lines.len(), &bit_counts);
+        let (gamma, epsilon) = calc_gamma_epsilon(&lines).unwrap();
         assert_eq!(gamma, 0b10110);
         assert_eq!(epsilon, 0b01001);
     }
 
     #[test]
-    fn test_calc_oxygen_generator_rating() {
-        let lines = SAMPLE_INPUT.lines().collect::<Vec<_>>();
-        let gen_rating = calc_oxygen_generator_rating(&lines);
-        assert_eq!(gen_rating, 0b10111);
-    }
+    fn test_calc_life_support_rating() {
+        let mut lines = SAMPLE_INPUT.lines().collect::<Vec<_>>();
+        lines.sort();
+        let oxygen_rating = calc_life_support_rating(&lines, true);
+        assert_eq!(oxygen_rating, 0b10111);
 
-    #[test]
-    fn test_co2_scrubber_rating() {
-        let lines = SAMPLE_INPUT.lines().collect::<Vec<_>>();
-        let rating = calc_co2_scrubber_rating(&lines);
-        assert_eq!(rating, 0b01010);
+        let co2_scrubber_rating = calc_life_support_rating(&lines, false);
+        assert_eq!(co2_scrubber_rating, 0b01010);
     }
 }
