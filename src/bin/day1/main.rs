@@ -1,6 +1,4 @@
-use std::env;
 use std::error::Error;
-use std::fs;
 
 fn count_3window_increases(values: &[i32]) -> i32 {
     let three_window_sums: Vec<i32> = values
@@ -25,15 +23,7 @@ fn count_increases(values: &[i32]) -> i32 {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        Err(format!(
-            "Usage: {} <input file>",
-            args.get(0).unwrap_or(&"prog".into())
-        ))?;
-    }
-
-    let input = fs::read_to_string(&args[1])?;
+    let input = aoc2021::get_input_string()?;
     let values = input
         .lines()
         .map(|l| l.parse())

@@ -1,17 +1,7 @@
-use std::env;
 use std::error::Error;
-use std::fs;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        Err(format!(
-            "Usage: {} <input file>",
-            args.get(0).unwrap_or(&"prog".into())
-        ))?;
-    }
-
-    let input = fs::read_to_string(&args[1])?;
+    let input = aoc2021::get_input_string()?;
     let mut lines = input.lines().collect::<Vec<_>>();
     lines.sort();
     let (gamma, epsilon) = calc_gamma_epsilon(&lines)?;

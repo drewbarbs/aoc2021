@@ -1,6 +1,4 @@
-use std::env;
 use std::error::Error;
-use std::fs;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
@@ -57,15 +55,7 @@ fn part2(commands: &[Command]) -> (i32, i32) {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        Err(format!(
-            "Usage: {} <input file>",
-            args.get(0).unwrap_or(&"prog".into())
-        ))?;
-    }
-
-    let input = fs::read_to_string(&args[1])?;
+    let input = aoc2021::get_input_string()?;
     let commands = parse_input(&input)?;
 
     let part1 = part1(commands.as_slice());
