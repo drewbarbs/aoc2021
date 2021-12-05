@@ -40,23 +40,21 @@ fn parse_input(input: &str) -> Result<(Vec<Board>, Drawing), Box<dyn Error>> {
         }
 
         let cur_board: &mut Board = cur_board.as_mut().unwrap();
-        cur_board.row_count.resize(cur_board.row_count.len() + 1, 0);
-        line.split(' ')
+        let r = cur_board.row_count.len();
+        cur_board.row_count.resize(r + 1, 0);
+        for (c, v) in line
+            .split_whitespace()
             .filter_map(|i| i.parse::<u32>().ok())
-            .scan((cur_board.row_count.len() - 1, 0usize), |(r, c), n| {
-                if *r == 0 {
-                    cur_board.col_count.resize(*c + 1, 0);
-                }
-                cur_board.col_count[*c] += 1;
-                cur_board.row_count[*r] += 1;
-                cur_board.coords.insert(n, (*r, *c));
-                cur_board.total_sum += n;
-
-                *c += 1;
-
-                Some(())
-            })
-            .for_each(drop);
+            .enumerate()
+        {
+            if r == 0 {
+                cur_board.col_count.resize(c + 1, 0);
+            }
+            cur_board.col_count[c] += 1;
+            cur_board.row_count[r] += 1;
+            cur_board.coords.insert(v, (r, c));
+            cur_board.total_sum += v;
+        }
     }
     if let Some(last_board) = cur_board {
         boards.push(last_board)
@@ -65,40 +63,23 @@ fn parse_input(input: &str) -> Result<(Vec<Board>, Drawing), Box<dyn Error>> {
     Ok((boards, drawing))
 }
 
-fn run_game(mut boards: Vec<Board>, drawing: Drawing) -> Option<u32> {
-    for n in drawing {
-        for board in boards.iter_mut() {
-            if let Some((r, c)) = board.coords.get(&n) {
-                board.total_sum -= n;
-                board.col_count[*c] -= 1;
-                board.row_count[*r] -= 1;
-                if board.row_count[*r] == 0 || board.col_count[*c] == 0 {
-                    return Some(n * board.total_sum);
-                }
-            }
-        }
-    }
-
-    None
-}
-
-fn part2(mut boards: Vec<Board>, drawing: Drawing) -> Option<u32> {
+fn run_games(mut boards: Vec<Board>, drawing: Drawing) -> Option<(u32, u32)> {
     let mut board_has_won = vec![false; boards.len()];
+    let mut winner_score: Option<u32> = None;
 
     for n in drawing {
         for (i, board) in boards.iter_mut().enumerate() {
-            if board_has_won[i] {
-                continue;
-            }
-
             if let Some((r, c)) = board.coords.get(&n) {
                 board.total_sum -= n;
                 board.col_count[*c] -= 1;
                 board.row_count[*r] -= 1;
                 if board.row_count[*r] == 0 || board.col_count[*c] == 0 {
                     board_has_won[i] = true;
-                    if board_has_won.iter().all(|b| *b) {
-                        return Some(n * board.total_sum);
+                    let board_score = n * board.total_sum;
+                    if winner_score.is_none() {
+                        winner_score = Some(board_score);
+                    } else if board_has_won.iter().all(|b| *b) {
+                        return Some((winner_score.unwrap(), board_score));
                     }
                 }
             }
@@ -120,11 +101,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input = fs::read_to_string(&args[1])?;
 
     let (boards, drawing) = parse_input(&input)?;
-    let result = run_game(boards.clone(), drawing.clone());
-    println!("Part 1: {:?}", result);
-
-    let result = part2(boards, drawing);
-    println!("Part 2: {:?}", result);
+    let (part1, part2) = run_games(boards, drawing).unwrap();
+    println!("Part 1: {:?}", part1);
+    println!("Part 2: {:?}", part2);
 
     Ok(())
 }
@@ -151,6 +130,8 @@ mod tests {
     fn test_game() {
         let (boards, nums) = parse_input(SAMPLE_INPUT).unwrap();
 
-        assert_eq!(run_game(boards, nums), Some(4512));
+        let (part1, part2) = run_games(boards, nums).unwrap();
+        assert_eq!(part1, 4512);
+        assert_eq!(part2, 1924);
     }
 }
