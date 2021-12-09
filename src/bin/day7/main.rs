@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 
 fn parse_input(s: &str) -> Result<Vec<i32>, Box<dyn Error>> {
@@ -49,11 +50,42 @@ fn part1(mut positions: Vec<i32>) -> i32 {
     *dists.iter().min().unwrap()
 }
 
+fn part2(mut positions: Vec<i32>) -> usize {
+    positions.sort();
+    let max_pos: usize = *positions.last().unwrap() as usize;
+
+    // make an vector where fuel_to[x] = the amount of fuel it takes
+    // to travel x units
+    let mut fuel_to: Vec<usize> = Vec::with_capacity(max_pos + 1);
+    fuel_to.push(0);
+    let mut delta = 1;
+    for i in 1..(max_pos + 1) {
+        fuel_to.push(fuel_to[i - 1] + delta);
+        delta += 1;
+    }
+
+    let mut counter: HashMap<i32, usize> = HashMap::new();
+    for p in positions.iter() {
+        let cur_count = *counter.get(p).unwrap_or(&0);
+        counter.insert(*p, cur_count + 1);
+    }
+
+    let mut targets: Vec<usize> = vec![0; max_pos + 1];
+    for i in 0i32..=(max_pos as i32) {
+        for (pos, count) in counter.iter() {
+            targets[i as usize] += *count * fuel_to[(*pos - i).abs() as usize];
+        }
+    }
+
+    *targets.iter().min().unwrap()
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let input = aoc2021::get_input_string()?;
-    let mut positions = parse_input(&input)?;
+    let positions = parse_input(&input)?;
 
-    println!("Part 1: {}", part1(positions));
+    println!("Part 1: {}", part1(positions.clone()));
+    println!("Part 2: {}", part2(positions.clone()));
 
     Ok(())
 }
