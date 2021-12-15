@@ -9,48 +9,20 @@ def i2c(N, M, idx):
 def c2i(N, M, r, c):
     return r*M + c
 
+
 def neighbors(N, M, r, c):
     return [(nr, nc) for nr, nc in ((r-1, c), (r+1, c), (r, c-1), (r, c+1))
             if 0 <= nr < N and 0 <= nc < M]
-
-class PriQ:
-    def __init__(self):
-        self.pq = []
-        self.entry_finder = {}
-
-    def remove(self, idx):
-        entry = self.entry_finder.pop(idx)
-        entry[-1] = None
-
-    def add(self, idx, dist):
-        if idx in self.entry_finder:
-            remove(idx)
-        entry = [dist, idx]
-        self.entry_finder[idx] = entry
-        heapq.heappush(self.pq, entry)
-
-    def pop(self):
-        while self.pq:
-            dist, idx = heapq.heappop(self.pq)
-            if idx is not None:
-                del self.entry_finder[idx]
-                return dist, idx
-        raise KeyError('pop from empty priq')
 
 
 def dijkstra(mat, source_node, target_node):
     N = len(mat)
     M = len(mat[0])
     dist_to = [-1] * (N * M)
-    priq = PriQ()
+    pq = [(0, 0)]
 
-    priq.add(0, 0)
-    while priq.pq:
-        try:
-            dist, idx = priq.pop()
-        except KeyError:
-            break
-        dist_to[idx] = dist
+    while pq:
+        dist, idx = heapq.heappop(pq)
         if idx == target_node:
             break
 
@@ -61,7 +33,7 @@ def dijkstra(mat, source_node, target_node):
             cur_dist = dist_to[nidx]
             if cur_dist == -1 or (entry_cost + dist < cur_dist):
                 dist_to[nidx] = entry_cost + dist
-                priq.add(nidx, dist_to[nidx])
+                heapq.heappush(pq, (dist_to[nidx], nidx))
 
     return dist_to
 
