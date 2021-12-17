@@ -1,6 +1,9 @@
+use std::error::Error;
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let input = aoc2021::get_input_string()
+    let _input = aoc2021::get_input_string()?
         .lines()
-        .filter(|l| l.strip().len() > 0)
+        .filter(|l| l.trim().len() > 0)
         .collect::<Vec<_>>();
+    Ok(())
 }
