@@ -33,7 +33,7 @@ def part2(p1_start, p2_start):
     n_wins = [0, 0]
 
     possible_roll_seqs = defaultdict(int)
-    for rolls in itertools.product(range(1, 4), range(1, 4), range(1, 4)):
+    for rolls in itertools.product(range(1, 4), repeat=3):
         possible_roll_seqs[sum(rolls)] += 1
 
     while any(player_states):
@@ -47,15 +47,16 @@ def part2(p1_start, p2_start):
                     n_wins[0] += p1_steps_possibilities * count
                 else:
                     for p2_steps, p2_steps_possibilities in possible_roll_seqs.items():
+                        next_possibilities = p1_steps_possibilities * p2_steps_possibilities * count
                         next_p2_pos = ((p2_pos + p2_steps - 1) % 10) + 1
                         next_p2_score = p2_score + next_p2_pos
 
                         if next_p2_score >= 21:
-                            n_wins[1] += p1_steps_possibilities * p2_steps_possibilities * count
+                            n_wins[1] += next_possibilities
                         else:
                             new_state = (next_p1_pos, next_p1_score,
                                          next_p2_pos, next_p2_score)
-                            new_player_states[new_state] += p1_steps_possibilities * p2_steps_possibilities * count
+                            new_player_states[new_state] += next_possibilities
         player_states = new_player_states
 
     return max(n_wins)
