@@ -1,6 +1,7 @@
 import argparse
 import itertools
-from functools import cache
+from collections import defaultdict
+from typing import Dict, List, Tuple
 
 from frozendict import frozendict
 
@@ -22,7 +23,7 @@ def print_map(map_):
         print()
 
 
-def potential_moves(start_pos, move_count, cur_map, rooms) -> list[((int, int), int)]:
+def potential_moves(start_pos, move_count, cur_map, rooms) -> List[Tuple[Tuple[int, int], int]]:
     # figure out spots we have paths to using bfs
     amphipod_type = cur_map[start_pos]
     assert amphipod_type in 'ABCD'
@@ -66,7 +67,7 @@ def potential_moves(start_pos, move_count, cur_map, rooms) -> list[((int, int), 
 
 def successor_states(state, rooms):
     successors = []
-    outstanding_amphipods, cost, cur_map = state
+    cost, outstanding_amphipods, cur_map = state
     for amphipod, move_count in outstanding_amphipods:
         options = potential_moves(amphipod, move_count, cur_map, rooms)
         if not options:
@@ -79,14 +80,13 @@ def successor_states(state, rooms):
             new_map = cur_map | {amphipod: '.', dest: amphipod_type}
             if dest in rooms[amphipod_type]:
                 # this amphipod is no longer outstanding
-                successors.append((other_amphipods, cost + trip_cost, new_map))
+                successors.append((cost + trip_cost, other_amphipods, new_map))
             else:
-                successors.append((other_amphipods | {(dest, move_count + 1)}, cost + trip_cost, new_map))
+                successors.append((cost + trip_cost, other_amphipods | {(dest, move_count + 1)}, new_map))
 
     return successors
 
 
-@cache
 def min_score_for_state(state, rooms):
     min_score = None
     for s in successor_states(state, rooms):
@@ -104,28 +104,25 @@ def min_score(map_):
              zip('ABCD', itertools.groupby(initial_positions, key=lambda k: k[0]))}
     rooms = frozendict(rooms)
 
-    finish_states = []
     # run all possible states (amphipod positions/n moves, cost, map)
     initial_amphipod_states = frozenset((p, 0) for p in initial_positions if p != rooms[map_[p]][1])
-    states = {(initial_amphipod_states, 0, map_)}
+    stack = [(0, initial_amphipod_states, map_)]
 
     seen_states = set()
     min_cost = None
-    while states:
-        state = states.pop()
-        for succ in successor_states(state, rooms):
-            outstanding = succ[0]
+    while stack:
+        state = stack.pop()
+        for next_cost, outstanding, next_map in successor_states(state, rooms):
             if not outstanding:
-                finish_states.append(succ)
-                min_cost = min(succ[1], min_cost or float('inf'))
-            elif (min_cost is None or succ[1] < min_cost) and succ not in seen_states:
-                states.add(succ)
-                seen_states.add(succ)
+                min_cost = min(next_cost, min_cost or float('inf'))
+            elif (min_cost is None or next_cost < min_cost) and hash((next_cost, outstanding)) not in seen_states:
+                stack.append((next_cost, outstanding, next_map))
+                seen_states.add(hash((next_cost, outstanding)))
 
     return min_cost
 
 
-def parse_input(s: str) -> dict[(int, int), str]:
+def parse_input(s: str) -> Dict[Tuple[int, int], str]:
     map_ = {}
     for y, line in enumerate(s.splitlines()):
         for x, c in enumerate(line):
