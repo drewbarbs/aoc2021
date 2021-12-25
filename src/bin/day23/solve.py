@@ -1,4 +1,5 @@
 import argparse
+import heapq
 import itertools
 from collections import defaultdict
 from typing import Dict, List, Tuple
@@ -87,17 +88,6 @@ def successor_states(state, rooms):
     return successors
 
 
-def min_score_for_state(state, rooms):
-    min_score = None
-    for s in successor_states(state, rooms):
-        if not s[0]:
-            min_score = min(min_score, s[1]) if min_score is not None else s[1]
-        elif score := min_score_for_state(s, rooms):
-            min_score = min(min_score, score) if min_score is not None else score
-
-    return min_score
-
-
 def min_score(map_):
     initial_positions = sorted(pos for pos, v in map_.items() if v in 'ABCD')
     rooms = {k: tuple(positions) for k, (x, positions) in
@@ -106,18 +96,27 @@ def min_score(map_):
 
     # run all possible states (amphipod positions/n moves, cost, map)
     initial_amphipod_states = frozenset((p, 0) for p in initial_positions if p != rooms[map_[p]][1])
-    stack = [(0, initial_amphipod_states, map_)]
 
-    seen_states = set()
+    distance_to = defaultdict(lambda: float('inf'))
+    visited = set()
+    entry_counter = itertools.count()
+    queue = [(0, next(entry_counter), initial_amphipod_states, map_)]
     min_cost = None
-    while stack:
-        state = stack.pop()
-        for next_cost, outstanding, next_map in successor_states(state, rooms):
-            if not outstanding:
-                min_cost = min(next_cost, min_cost or float('inf'))
-            elif (min_cost is None or next_cost < min_cost) and hash((next_cost, outstanding)) not in seen_states:
-                stack.append((next_cost, outstanding, next_map))
-                seen_states.add(hash((next_cost, outstanding)))
+    while queue:
+        cur_cost, _, cur_outstanding, cur_map = heapq.heappop(queue)
+        if not cur_outstanding:
+            return cur_cost
+
+        if hash((cur_outstanding, cur_map)) in visited:
+            continue
+
+        visited.add(hash((cur_outstanding, cur_map)))
+
+        for next_cost, next_outstanding, next_map in successor_states((cur_cost, cur_outstanding, cur_map), rooms):
+            node = (next_outstanding, next_map)
+            if next_cost < distance_to[hash(node)]:
+                distance_to[hash(node)] = next_cost
+                heapq.heappush(queue, (next_cost, next(entry_counter), next_outstanding, next_map))
 
     return min_cost
 
@@ -140,6 +139,7 @@ def main():
         map_ = parse_input(f.read())
 
     print(min_score(map_))
+
 
 
 if __name__ == '__main__':
