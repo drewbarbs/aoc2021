@@ -4,7 +4,6 @@ import itertools
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-from frozendict import frozendict
 
 ENERGY_PER_STEP = {
     'A': 1,
@@ -24,34 +23,30 @@ def print_map(map_):
         print()
 
 
-def potential_moves(start_pos, move_count, cur_map, rooms) -> List[Tuple[Tuple[int, int], int]]:
-    # figure out spots we have paths to using bfs
-    amphipod_type = cur_map[start_pos]
-    assert amphipod_type in 'ABCD'
+def potential_moves(start_pos, amphipod_type, move_count, cur_map, rooms) -> List[Tuple[Tuple[int, int], int]]:
     doorways = [(spots[0][0], spots[0][1] - 1) for spots in rooms.values()]
-    other_room_spaces = set(s for typ, spaces in rooms.items() if typ != amphipod_type for s in spaces)
+    other_room_spaces = [s for typ, spaces in rooms.items() if typ != amphipod_type for s in spaces]
 
     # amphipod can only enter its room if no other type of amphipod is in that room,
     # will go to the furthest-in space
     if any(cur_map[s] in 'ABCD' and cur_map[s] != amphipod_type for s in rooms[amphipod_type]):
         target_spot = None
     else:
-        available_spaces = [space for space in rooms[amphipod_type] if cur_map[space] == '.']
-        target_spot = max(available_spaces) if available_spaces else None
+        target_spot = max((space for space in rooms[amphipod_type] if cur_map[space] == '.'), default=None)
 
     if move_count == 1 and target_spot is None:
-        return []
+        return
 
-    options = []
     visited = {start_pos}
     frontier = [(start_pos, 0)]
+    step_energy = ENERGY_PER_STEP[amphipod_type]
     while frontier:
         (x, y), cost = frontier.pop(0)
         for next_pos in ((x-1, y), (x+1, y), (x, y-1), (x, y+1)):
-            if next_pos in visited or cur_map[next_pos] != '.':
+            if cur_map[next_pos] != '.' or next_pos in visited:
                 continue
 
-            frontier.append((next_pos, cost + ENERGY_PER_STEP[amphipod_type]))
+            frontier.append((next_pos, cost + step_energy))
             visited.add(next_pos)
 
             if next_pos in other_room_spaces:
@@ -59,34 +54,24 @@ def potential_moves(start_pos, move_count, cur_map, rooms) -> List[Tuple[Tuple[i
 
             # can we actually stop here?
             if next_pos == target_spot:
-                options.append(frontier[-1])
-            elif move_count == 0 and next_pos not in doorways:
-                options.append(frontier[-1])
-
-    return options
+                yield frontier[-1]
+            elif move_count == 0 and next_pos not in doorways and next_pos[0] != rooms[amphipod_type][0][0]:
+                yield frontier[-1]
 
 
 def successor_states(state, rooms):
-    successors = []
     cost, outstanding_amphipods, cur_map = state
-    for amphipod, move_count in outstanding_amphipods:
-        options = potential_moves(amphipod, move_count, cur_map, rooms)
-        if not options:
-            # deadlock
-            continue
-
-        amphipod_type = cur_map[amphipod]
-        other_amphipods = outstanding_amphipods - {(amphipod, move_count)}
-        for dest, trip_cost in options:
-            new_map = cur_map | {amphipod: '.', dest: amphipod_type}
+    for amphipod, amphipod_type, move_count in outstanding_amphipods:
+        other_amphipods = outstanding_amphipods - {(amphipod, amphipod_type, move_count)}
+        for dest, trip_cost in potential_moves(amphipod, amphipod_type, move_count, cur_map, rooms):
+            new_map = cur_map.copy()
+            new_map.update({amphipod: '.', dest: amphipod_type})
             new_cost = cost + trip_cost
             if dest in rooms[amphipod_type]:
                 # this amphipod is no longer outstanding
-                successors.append((new_cost, other_amphipods, new_map))
+                yield (new_cost, other_amphipods, new_map)
             else:
-                successors.append((new_cost, other_amphipods | {(dest, move_count + 1)}, new_map))
-
-    return successors
+                yield (new_cost, other_amphipods | {(dest, amphipod_type, move_count + 1)}, new_map)
 
 
 def initial_amphipod_states(map_, initial_positions, rooms):
@@ -96,7 +81,7 @@ def initial_amphipod_states(map_, initial_positions, rooms):
         if p[0] == rooms[typ][0][0] and all(map_[r] == typ for r in rooms[typ] if r[1] > p[1]):
             continue
         else:
-            initial_amphipod_states.add((p, 0))
+            initial_amphipod_states.add((p, typ, 0))
 
     return frozenset(initial_amphipod_states)
 
@@ -105,9 +90,7 @@ def min_score(map_):
     initial_positions = sorted(pos for pos, v in map_.items() if v in 'ABCD')
     rooms = {k: tuple(positions) for k, (x, positions) in
              zip('ABCD', itertools.groupby(initial_positions, key=lambda k: k[0]))}
-    rooms = frozendict(rooms)
 
-    # run all possible states (amphipod positions/n moves, cost, map)
     init_states = initial_amphipod_states(map_, initial_positions, rooms)
 
     distance_to = defaultdict(lambda: float('inf'))
@@ -120,15 +103,14 @@ def min_score(map_):
         if not cur_outstanding:
             return cur_cost
 
-        if hash((cur_outstanding, cur_map)) in visited:
+        if cur_outstanding in visited:
             continue
 
-        visited.add(hash((cur_outstanding, cur_map)))
+        visited.add(cur_outstanding)
 
         for next_cost, next_outstanding, next_map in successor_states((cur_cost, cur_outstanding, cur_map), rooms):
-            node = (next_outstanding, next_map)
-            if next_cost < distance_to[hash(node)]:
-                distance_to[hash(node)] = next_cost
+            if next_cost < distance_to[next_outstanding]:
+                distance_to[next_outstanding] = next_cost
                 heapq.heappush(queue, (next_cost, next(entry_counter), next_outstanding, next_map))
 
     return min_cost
@@ -139,7 +121,7 @@ def parse_input(s: str) -> Dict[Tuple[int, int], str]:
     for y, line in enumerate(s.splitlines()):
         for x, c in enumerate(line):
             map_[(x, y)] = c
-    return frozendict(map_)
+    return map_
 
 
 def main():
