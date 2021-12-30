@@ -79,13 +79,26 @@ def successor_states(state, rooms):
         other_amphipods = outstanding_amphipods - {(amphipod, move_count)}
         for dest, trip_cost in options:
             new_map = cur_map | {amphipod: '.', dest: amphipod_type}
+            new_cost = cost + trip_cost
             if dest in rooms[amphipod_type]:
                 # this amphipod is no longer outstanding
-                successors.append((cost + trip_cost, other_amphipods, new_map))
+                successors.append((new_cost, other_amphipods, new_map))
             else:
-                successors.append((cost + trip_cost, other_amphipods | {(dest, move_count + 1)}, new_map))
+                successors.append((new_cost, other_amphipods | {(dest, move_count + 1)}, new_map))
 
     return successors
+
+
+def initial_amphipod_states(map_, initial_positions, rooms):
+    initial_amphipod_states = set()
+    for p in initial_positions:
+        typ = map_[p]
+        if p[0] == rooms[typ][0][0] and all(map_[r] == typ for r in rooms[typ] if r[1] > p[1]):
+            continue
+        else:
+            initial_amphipod_states.add((p, 0))
+
+    return frozenset(initial_amphipod_states)
 
 
 def min_score(map_):
@@ -95,12 +108,12 @@ def min_score(map_):
     rooms = frozendict(rooms)
 
     # run all possible states (amphipod positions/n moves, cost, map)
-    initial_amphipod_states = frozenset((p, 0) for p in initial_positions if p != rooms[map_[p]][1])
+    init_states = initial_amphipod_states(map_, initial_positions, rooms)
 
     distance_to = defaultdict(lambda: float('inf'))
     visited = set()
     entry_counter = itertools.count()
-    queue = [(0, next(entry_counter), initial_amphipod_states, map_)]
+    queue = [(0, next(entry_counter), init_states, map_)]
     min_cost = None
     while queue:
         cur_cost, _, cur_outstanding, cur_map = heapq.heappop(queue)
@@ -139,7 +152,6 @@ def main():
         map_ = parse_input(f.read())
 
     print(min_score(map_))
-
 
 
 if __name__ == '__main__':
